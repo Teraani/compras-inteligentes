@@ -1,0 +1,218 @@
+{
+  "listas": {
+    "Mercado": [
+      {
+        "produto": "UVA THOMPSON BDJ 500G",
+        "valor": 10.98,
+        "categoria": "hortifruti",
+        "marcado": true
+      },
+      {
+        "produto": "PAO FRANCES KG",
+        "valor": 2.06,
+        "categoria": "padaria",
+        "marcado": true
+      },
+      {
+        "produto": "PEITO FGO C/OSSO S/PELE KG",
+        "valor": 13.1,
+        "categoria": "carnes",
+        "marcado": true
+      },
+      {
+        "produto": "QJO MUSS TIROLEZ KG",
+        "valor": 12.52,
+        "categoria": "laticinios",
+        "marcado": true
+      },
+      {
+        "produto": "ACEM BOVINO KG",
+        "valor": 17.74,
+        "categoria": "carnes",
+        "marcado": true
+      },
+      {
+        "produto": "CREME LEITE ITALAC 200G",
+        "valor": 2.99,
+        "categoria": "laticinios",
+        "marcado": true
+      },
+      {
+        "produto": "AZEITONA VERDE SCAROCO 1KG",
+        "valor": 6.56,
+        "categoria": "outros",
+        "marcado": true
+      },
+      {
+        "produto": "TOMATE PELADO OLE 400G LT",
+        "valor": 8.29,
+        "categoria": "hortifruti",
+        "marcado": true
+      },
+      {
+        "produto": "PAO FORMA PANCO 500G TRAD",
+        "valor": 8.98,
+        "categoria": "padaria",
+        "marcado": true
+      },
+      {
+        "produto": "PIZZA MONALE BAURU KG",
+        "valor": 14.49,
+        "categoria": "outros",
+        "marcado": true
+      },
+      {
+        "produto": "PIZZA MONALE MUSSARELA KG",
+        "valor": 11.9,
+        "categoria": "laticinios",
+        "marcado": true
+      },
+      {
+        "produto": "MANGA PALMER 1KG",
+        "valor": 14.47,
+        "categoria": "hortifruti",
+        "marcado": true
+      },
+      {
+        "produto": "MAMAO PAPAIA KG",
+        "valor": 10.03,
+        "categoria": "hortifruti",
+        "marcado": true
+      },
+      {
+        "produto": "ALCATRA BOVINO KG",
+        "valor": 44.01,
+        "categoria": "carnes",
+        "marcado": true
+      },
+      {
+        "produto": "QJO RALADO GALBANI 50G PARMESA",
+        "valor": 4.99,
+        "categoria": "outros",
+        "marcado": true
+      },
+      {
+        "produto": "LARANJA PERA 1KG",
+        "valor": 6.67,
+        "categoria": "hortifruti",
+        "marcado": true
+      }
+    ]
+  },
+  "historico": [
+    {
+      "id": "https://www.nfce.fazenda.sp.gov.br/qrcode?p=35260259419999000150650010000246491791599718|2|1|1|CA5443184D1C5B22CE9C383F45E5154259B289BD",
+      "loja": "MONALE SUPERMERCADO LTDA",
+      "itens": [
+        {
+          "produto": "UVA THOMPSON BDJ 500G",
+          "valor": 10.98,
+          "categoria": "hortifruti",
+          "marcado": false
+        },
+        {
+          "produto": "PAO FRANCES KG",
+          "valor": 2.06,
+          "categoria": "padaria",
+          "marcado": false
+        },
+        {
+          "produto": "PEITO FGO C/OSSO S/PELE KG",
+          "valor": 13.1,
+          "categoria": "carnes",
+          "marcado": false
+        },
+        {
+          "produto": "QJO MUSS TIROLEZ KG",
+          "valor": 12.52,
+          "categoria": "laticinios",
+          "marcado": false
+        },
+        {
+          "produto": "ACEM BOVINO KG",
+          "valor": 17.74,
+          "categoria": "carnes",
+          "marcado": false
+        },
+        {
+          "produto": "CREME LEITE ITALAC 200G",
+          "valor": 2.99,
+          "categoria": "laticinios",
+          "marcado": false
+        },
+        {
+          "produto": "AZEITONA VERDE SCAROCO 1KG",
+          "valor": 6.56,
+          "categoria": "outros",
+          "marcado": false
+        },
+        {
+          "produto": "TOMATE PELADO OLE 400G LT",
+          "valor": 8.29,
+          "categoria": "hortifruti",
+          "marcado": false
+        },
+        {
+          "produto": "PAO FORMA PANCO 500G TRAD",
+          "valor": 8.98,
+          "categoria": "padaria",
+          "marcado": false
+        },
+        {
+          "produto": "PIZZA MONALE BAURU KG",
+          "valor": 14.49,
+          "categoria": "outros",
+          "marcado": false
+        },
+        {
+          "produto": "PIZZA MONALE MUSSARELA KG",
+          "valor": 11.9,
+          "categoria": "laticinios",
+          "marcado": false
+        },
+        {
+          "produto": "MANGA PALMER 1KG",
+          "valor": 14.47,
+          "categoria": "hortifruti",
+          "marcado": false
+        },
+        {
+          "produto": "MAMAO PAPAIA KG",
+          "valor": 10.03,
+          "categoria": "hortifruti",
+          "marcado": false
+        },
+        {
+          "produto": "ALCATRA BOVINO KG",
+          "valor": 44.01,
+          "categoria": "carnes",
+          "marcado": false
+        },
+        {
+          "produto": "QJO RALADO GALBANI 50G PARMESA",
+          "valor": 4.99,
+          "categoria": "outros",
+          "marcado": false
+        },
+        {
+          "produto": "LARANJA PERA 1KG",
+          "valor": 6.67,
+          "categoria": "hortifruti",
+          "marcado": false
+        }
+      ],
+      "mes": "2026-02",
+      "data": "08/02/2026 16:42"
+    }
+  ],
+  "aprendizado": {
+    "uva thompson bdj 500g": "hortifruti"
+  },
+  "categorias": [
+    "carnes",
+    "hortifruti",
+    "laticinios",
+    "padaria",
+    "outros"
+  ]
+}
