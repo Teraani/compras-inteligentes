@@ -11,21 +11,25 @@ import re
 DB = "compras.json"
 
 # ======================
-# CSS compacto (mobile)
+# CSS compacto mobile
 # ======================
 
 st.markdown("""
 <style>
+
 .block-container {
     padding-top: 1rem;
     padding-bottom: 1rem;
 }
+
 div[data-testid="stVerticalBlock"] > div {
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
-.stCheckbox {
-    margin-bottom: -10px;
+
+.stRadio > div {
+    flex-direction: column;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,10 +66,10 @@ def categorizar(nome):
     n = nome.lower()
 
     mapa = {
-        "hortifruti": ["uva", "banana", "manga", "tomate", "laranja", "mamão"],
+        "hortifruti": ["uva","banana","manga","tomate","laranja","mamão"],
         "padaria": ["pao"],
-        "carnes": ["bovino", "frango", "acem"],
-        "laticinios": ["leite", "queijo"],
+        "carnes": ["bovino","frango","acem"],
+        "laticinios": ["leite","queijo"],
     }
 
     for cat, palavras in mapa.items():
@@ -75,7 +79,7 @@ def categorizar(nome):
     return "outros"
 
 # ======================
-# QR scanner
+# QR
 # ======================
 
 def ler_qr(img):
@@ -87,7 +91,7 @@ def ler_qr(img):
         return None
 
 # ======================
-# LIMPAR VALOR
+# VALOR
 # ======================
 
 def limpar_valor(texto):
@@ -150,25 +154,21 @@ def extrair_nfce(url):
     }
 
 # ======================
-# UI — MENU MOBILE
+# MENU VERTICAL MOBILE
 # ======================
 
 st.title("🛒 Compras Inteligentes")
 
-tabs = st.tabs([
-    "📸 Scan Cupom",
-    "📋 Minhas Listas",
-    "📊 Resumo Mensal",
-    "🗂 Histórico"
-])
-
-scan_tab, lista_tab, resumo_tab, hist_tab = tabs
+menu = st.radio(
+    "Menu",
+    ["📸 Scan Cupom","📋 Listas","📊 Categorias","🗂 Histórico"]
+)
 
 # ======================
-# SCAN CUPOM
+# SCAN
 # ======================
 
-with scan_tab:
+if menu == "📸 Scan Cupom":
 
     if "qr_url" not in st.session_state:
         st.session_state.qr_url = None
@@ -185,8 +185,7 @@ with scan_tab:
     else:
 
         lista = st.selectbox("Importar para:", list(db["listas"].keys()))
-
-        img = st.file_uploader("Fotografe o QR do cupom")
+        img = st.file_uploader("Foto do QR")
 
         if img:
             url = ler_qr(img)
@@ -197,31 +196,27 @@ with scan_tab:
 
         if st.session_state.qr_url:
 
-            if st.button("Importar cupom"):
+            if st.button("Importar"):
 
-                try:
+                compra = extrair_nfce(st.session_state.qr_url)
 
-                    compra = extrair_nfce(st.session_state.qr_url)
+                if any(c.get("id") == compra["id"] for c in db["historico"]):
+                    st.warning("Cupom já importado!")
 
-                    if any(c.get("id") == compra["id"] for c in db["historico"]):
-                        st.warning("Cupom já importado!")
-                    else:
-                        db["listas"][lista].extend(compra["itens"])
-                        db["historico"].append(compra)
-                        save_db(db)
-                        st.success("Compra importada!")
+                else:
+                    db["listas"][lista].extend(compra["itens"])
+                    db["historico"].append(compra)
+                    save_db(db)
+                    st.success("Importado!")
 
-                    st.session_state.qr_url = None
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+                st.session_state.qr_url = None
+                st.rerun()
 
 # ======================
 # LISTAS
 # ======================
 
-with lista_tab:
+elif menu == "📋 Listas":
 
     nova = st.text_input("Nova lista")
 
@@ -232,14 +227,14 @@ with lista_tab:
 
     if db["listas"]:
 
-        lista = st.selectbox("Escolha lista:", list(db["listas"].keys()))
+        lista = st.selectbox("Escolha:", list(db["listas"].keys()))
         itens = db["listas"][lista]
 
         total = 0
 
         for i, item in enumerate(itens):
 
-            c1, c2, c3 = st.columns([1,5,2])
+            c1,c2,c3 = st.columns([1,5,2])
 
             marcado = c1.checkbox("", item["marcado"], key=f"{lista}{i}")
             db["listas"][lista][i]["marcado"] = marcado
@@ -253,39 +248,34 @@ with lista_tab:
         save_db(db)
 
         st.divider()
-        st.subheader(f"💰 Total marcado: R$ {total:.2f}")
+        st.subheader(f"💰 Total: R$ {total:.2f}")
 
 # ======================
-# RESUMO
+# CATEGORIAS
 # ======================
 
-with resumo_tab:
+elif menu == "📊 Categorias":
 
     if not db["historico"]:
         st.info("Sem compras.")
     else:
 
-        meses = sorted({c["mes"] for c in db["historico"]})
-        mes = st.selectbox("Mês:", meses)
-
         itens = []
-
         for c in db["historico"]:
-            if c["mes"] == mes:
-                itens += c["itens"]
+            itens += c["itens"]
 
         df = pd.DataFrame(itens)
 
         resumo = df.groupby("categoria")["valor"].sum()
 
         st.bar_chart(resumo)
-        st.write("💰 Total:", df["valor"].sum())
+        st.write("💰 Total geral:", df["valor"].sum())
 
 # ======================
 # HISTÓRICO
 # ======================
 
-with hist_tab:
+elif menu == "🗂 Histórico":
 
     for c in db["historico"][::-1]:
         with st.expander(f"{c['loja']} — {c['data']}"):
