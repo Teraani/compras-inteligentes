@@ -8,23 +8,49 @@ from PIL import Image
 import pandas as pd
 import re
 
+# ======================
+# CONFIG MOBILE
+# ======================
+
+st.set_page_config(
+    page_title="Compras Inteligentes",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+st.markdown("""
+<style>
+
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+div[data-testid="stVerticalBlock"] > div {
+    gap: 0.5rem;
+}
+
+.stCheckbox {
+    margin-bottom: -10px;
+}
+
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ======================
+# BANCO
+# ======================
+
 DB = "compras.json"
 
-# ------------------------
-# Banco de Dados
-# ------------------------
 def load_db():
     if os.path.exists(DB):
         with open(DB, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if "aprendizado" not in data: data["aprendizado"] = {}
-            if "categorias" not in data or not data["categorias"]: 
-                data["categorias"] = ["carnes", "hortifruti", "laticinios", "padaria", "outros"]
-            return data
-    return {
-        "listas": {}, "historico": [], "aprendizado": {}, 
-        "categorias": ["carnes", "hortifruti", "laticinios", "padaria", "outros"]
-    }
+            return json.load(f)
+    return {"listas": {}, "historico": []}
 
 def save_db(data):
     with open(DB, "w", encoding="utf-8") as f:
@@ -32,203 +58,239 @@ def save_db(data):
 
 db = load_db()
 
-# ------------------------
-# Funções Auxiliares
-# ------------------------
-def formatar_moeda(valor):
-    return f"R$ {valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
-
-def limpar_valor(texto):
-    if not texto: return 0.0
-    texto = texto.replace('.', '').replace(',', '.')
-    match = re.search(r"\d+\.\d+", texto)
-    return float(match.group()) if match else 0.0
+# ======================
+# CATEGORIA
+# ======================
 
 def categorizar(nome):
+
     n = nome.lower()
-    if n in db.get("aprendizado", {}): return db["aprendizado"][n]
+
     mapa = {
-        "hortifruti": ["uva", "banana", "manga", "tomate", "papaia", "laranja"],
-        "padaria": ["pao", "forma", "bisnaguinha"],
-        "carnes": ["bovino", "frango", "acem", "alcatra", "peito", "sobrecoxa"],
-        "laticinios": ["queijo", "leite", "mussarela", "muss", "iogurte", "creme leite"],
+        "hortifruti": ["uva", "banana", "manga", "tomate", "laranja", "mamão"],
+        "padaria": ["pao"],
+        "carnes": ["bovino", "frango", "acem"],
+        "laticinios": ["leite", "queijo"],
     }
+
     for cat, palavras in mapa.items():
-        if any(p in n for p in palavras): return cat
+        if any(p in n for p in palavras):
+            return cat
+
     return "outros"
 
+# ======================
+# QR
+# ======================
+
+def ler_qr(img):
+
+    image = Image.open(img)
+    d = decode(image)
+
+    return d[0].data.decode() if d else None
+
+# ======================
+# LIMPAR VALOR
+# ======================
+
+def limpar_valor(texto):
+
+    if not texto:
+        return 0
+
+    match = re.search(r"\d+[,\.]\d+", texto)
+
+    if match:
+        return float(match.group().replace(",", "."))
+
+    return 0
+
+# ======================
+# PARSER NFCe
+# ======================
+
 def extrair_nfce(url):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    r = requests.get(url, timeout=15, headers=headers)
-    if r.status_code != 200: raise Exception("Falha ao acessar NFC-e")
+
+    r = requests.get(url, timeout=15)
+
+    if r.status_code != 200:
+        raise Exception("Falha ao acessar NFC-e")
+
     soup = BeautifulSoup(r.text, "html.parser")
+
     loja = soup.find("div", class_="txtTopo")
-    loja = loja.text.strip() if loja else "Supermercado"
+    loja = loja.text.strip() if loja else "Loja"
+
     itens = []
-    vistos = set()
-    for tr in soup.select("tr[id^='Item +']"):
-        nome_tag = tr.find(class_="txtTit")
-        valor_total_tag = tr.find(class_="valor") 
-        if nome_tag and valor_total_tag:
-            nome = nome_tag.text.strip()
-            valor_pago = limpar_valor(valor_total_tag.text)
-            if valor_pago > 0 and nome not in vistos:
-                vistos.add(nome)
-                itens.append({"produto": nome, "valor": round(valor_pago, 2), "categoria": categorizar(nome), "marcado": False})
-    return {"id": url, "loja": loja, "itens": itens, "mes": datetime.now().strftime("%Y-%m"), "data": datetime.now().strftime("%d/%m/%Y %H:%M")}
 
-# ------------------------
-# Interface Streamlit
-# ------------------------
-st.set_page_config(page_title="Compras Inteligentes", layout="wide")
+    for item in soup.select(".txtTit"):
 
-with st.sidebar:
-    st.title("🛒 Menu")
-    menu = st.radio("Navegação", [
-        "📸 Scan Cupom", "📋 Minhas Listas", "📊 Resumo Mensal", 
-        "🗂️ Categorias", "📖 Histórico", "🔍 Onde é mais barato?"
-    ])
+        nome = item.text.strip()
+        nome_l = nome.lower()
 
-# --- SCAN CUPOM ---
+        # ignora totais e lixo
+        if "vl" in nome_l or "total" in nome_l:
+            continue
+
+        bloco = item.parent
+        valor = bloco.find(class_="RvlUnit")
+
+        itens.append({
+            "produto": nome,
+            "valor": limpar_valor(valor.text) if valor else 0,
+            "categoria": categorizar(nome),
+            "marcado": False
+        })
+
+    if not itens:
+        raise Exception("Nenhum item encontrado")
+
+    return {
+        "id": hash(url),
+        "data": datetime.now().isoformat(),
+        "mes": datetime.now().strftime("%Y-%m"),
+        "loja": loja,
+        "itens": itens
+    }
+
+# ======================
+# UI
+# ======================
+
+st.title("🛒 Compras Inteligentes")
+
+menu = st.sidebar.radio(
+    "Menu",
+    ["📸 Scan Cupom", "📋 Minhas Listas", "📊 Resumo Mensal", "🗂 Histórico"]
+)
+
+# ======================
+# SCAN CUPOM
+# ======================
+
 if menu == "📸 Scan Cupom":
-    st.header("📸 Importar Cupom")
+
+    if "qr_url" not in st.session_state:
+        st.session_state.qr_url = None
+
     if not db["listas"]:
-        st.warning("Crie uma lista primeiro.")
+
+        nome = st.text_input("Crie sua primeira lista")
+
+        if st.button("Criar lista"):
+            db["listas"][nome] = []
+            save_db(db)
+            st.rerun()
+
     else:
-        lista_dest = st.selectbox("Importar para:", list(db["listas"].keys()))
-        t_foto, t_link = st.tabs(["📷 Foto", "🔗 Link"])
-        
-        with t_foto:
-            img_file = st.file_uploader("Upload do QR Code", type=['png', 'jpg', 'jpeg'])
-            if img_file:
-                img = Image.open(img_file)
-                dados = decode(img)
-                if dados:
-                    url_det = dados[0].data.decode()
-                    if st.button("Confirmar e Importar Foto"):
-                        if any(c.get("id") == url_det for c in db["historico"]):
-                            st.error("Este cupom já foi importado!")
-                        else:
-                            compra = extrair_nfce(url_det)
-                            db["listas"][lista_dest].extend(compra["itens"])
-                            db["historico"].append(compra)
-                            save_db(db)
-                            st.success(f"✅ Cupom importado com sucesso: {compra['loja']}!")
-                else:
-                    st.error("QR Code não detectado.")
 
-        with t_link:
-            url_man = st.text_input("Cole o link aqui:")
-            if st.button("Importar via Link") and url_man:
-                if any(c.get("id") == url_man for c in db["historico"]):
-                    st.error("Este cupom já foi importado!")
-                else:
-                    compra = extrair_nfce(url_man)
-                    db["listas"][lista_dest].extend(compra["itens"])
-                    db["historico"].append(compra)
-                    save_db(db)
-                    st.success(f"✅ Cupom importado com sucesso: {compra['loja']}!")
+        lista = st.selectbox("Importar para:", list(db["listas"].keys()))
 
-# --- MINHAS LISTAS ---
+        img = st.file_uploader("Fotografe o QR do cupom")
+
+        if img:
+
+            url = ler_qr(img)
+
+            if url:
+                st.session_state.qr_url = url
+                st.success("QR detectado!")
+
+        if st.session_state.qr_url:
+
+            if st.button("Importar cupom"):
+
+                try:
+
+                    compra = extrair_nfce(st.session_state.qr_url)
+
+                    # evita duplicação
+                    if any(c.get("id") == compra["id"] for c in db["historico"]):
+                        st.warning("Cupom já importado!")
+                    else:
+                        db["listas"][lista].extend(compra["itens"])
+                        db["historico"].append(compra)
+                        save_db(db)
+                        st.success("Compra importada!")
+
+                    st.session_state.qr_url = None
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+
+# ======================
+# LISTAS
+# ======================
+
 elif menu == "📋 Minhas Listas":
-    st.header("📋 Minhas Listas")
-    nome_l = st.text_input("Nova lista:")
-    if st.button("Criar Lista") and nome_l:
-        db["listas"][nome_l] = []; save_db(db); st.rerun()
+
+    nova = st.text_input("Nova lista")
+
+    if st.button("Criar"):
+        db["listas"][nova] = []
+        save_db(db)
+        st.rerun()
 
     if db["listas"]:
-        sel = st.selectbox("Lista ativa:", list(db["listas"].keys()))
-        c_b1, c_b2, c_b3 = st.columns(3)
-        if c_b1.button("✅ Marcar todos"):
-            for i in range(len(db["listas"][sel])): db["listas"][sel][i]["marcado"] = True
-            save_db(db); st.rerun()
-        if c_b3.button("🗑️ Limpar marcados"):
-            db["listas"][sel] = [i for i in db["listas"][sel] if not i["marcado"]]
-            save_db(db); st.rerun()
 
-        total = 0.0
-        for i, item in enumerate(db["listas"][sel]):
-            c1, c2, c3, c4 = st.columns([0.5, 3, 2, 1.5])
-            marcado = c1.checkbox("", value=item["marcado"], key=f"it_{sel}_{i}")
+        lista = st.selectbox("Escolha lista:", list(db["listas"].keys()))
+        itens = db["listas"][lista]
+
+        total = 0
+
+        for i, item in enumerate(itens):
+
+            c1, c2, c3 = st.columns([1,5,2])
+
+            marcado = c1.checkbox("", item["marcado"], key=f"{lista}{i}")
+            db["listas"][lista][i]["marcado"] = marcado
+
             c2.write(item["produto"])
-            idx_cat = db["categorias"].index(item["categoria"]) if item["categoria"] in db["categorias"] else 0
-            n_cat = c3.selectbox("Cat", db["categorias"], index=idx_cat, key=f"ct_{sel}_{i}", label_visibility="collapsed")
-            c4.write(f"R$ {item['valor']:.2f}")
+            c3.write(f"R$ {item['valor']:.2f}")
 
-            if marcado != item["marcado"] or n_cat != item["categoria"]:
-                db["aprendizado"][item["produto"].lower()] = n_cat
-                db["listas"][sel][i]["marcado"], db["listas"][sel][i]["categoria"] = marcado, n_cat
-                save_db(db); st.rerun()
-            if marcado: total += item["valor"]
+            if marcado:
+                total += item["valor"]
+
+        save_db(db)
+
         st.divider()
-        st.subheader(f"Total Marcado: {formatar_moeda(total)}")
+        st.subheader(f"💰 Total marcado: R$ {total:.2f}")
 
-# --- RESUMO MENSAL ---
+# ======================
+# RESUMO
+# ======================
+
 elif menu == "📊 Resumo Mensal":
-    st.header("📊 Resumo Mensal")
-    if not db["historico"]: st.info("Histórico vazio.")
+
+    if not db["historico"]:
+        st.info("Sem compras.")
     else:
-        df = pd.DataFrame([{"mes": c["mes"], "produto": it["produto"].upper(), "cat": db.get("aprendizado", {}).get(it["produto"].lower(), it["categoria"]), "valor": it["valor"]} for c in db["historico"] for it in c["itens"]])
-        mes_f = st.selectbox("Mês:", df["mes"].unique())
-        df_m = df[df["mes"] == mes_f]
-        st.bar_chart(df_m.groupby("cat")["valor"].sum())
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("🏆 Top 5 Itens")
-            top = df_m.groupby("produto")["valor"].sum().nlargest(5).reset_index()
-            top.index = top.index + 1
-            top["valor"] = top["valor"].apply(formatar_moeda)
-            st.table(top.rename(columns={"produto": "Produto", "valor": "Total"}))
-        with col2:
-            st.subheader("💰 Resumo")
-            st.metric("Total Gasto", formatar_moeda(df_m["valor"].sum()))
 
-# --- CATEGORIAS ---
-elif menu == "🗂️ Categorias":
-    st.header("🗂️ Gerenciar Categorias")
-    c1, c2 = st.columns([1, 1.5]) # Restaurado o layout de colunas
-    with c1:
-        st.subheader("➕ Adicionar")
-        # Campo limpa automaticamente após adicionar
-        nova_cat_input = st.text_input("Nome da categoria:", key="input_nova_cat")
-        if st.button("Adicionar"):
-            if nova_cat_input:
-                cl = nova_cat_input.strip().lower()
-                if cl not in db["categorias"]:
-                    db["categorias"].append(cl)
-                    save_db(db)
-                    st.rerun() # Rerun garante que o campo de texto seja limpo
-    with c2:
-        st.subheader("🗑️ Atuais")
-        for cat in db["categorias"]:
-            cl1, cl2 = st.columns([3, 1])
-            cl1.write(f"• {cat.capitalize()}")
-            if len(db["categorias"]) > 1 and cl2.button("Remover", key=f"rem_{cat}"):
-                db["categorias"].remove(cat)
-                save_db(db)
-                st.rerun()
+        meses = sorted({c["mes"] for c in db["historico"]})
+        mes = st.selectbox("Mês:", meses)
 
-# --- HISTÓRICO ---
-elif menu == "📖 Histórico":
-    st.header("📖 Histórico")
-    for comp in reversed(db["historico"]):
-        with st.expander(f"📅 {comp.get('data', 'S/D')} - {comp.get('loja', 'Loja')}"):
-            df_h = pd.DataFrame(comp["itens"])
-            df_h.index = df_h.index + 1
-            st.table(df_h[["produto", "valor"]])
-            st.write(f"**Total: {formatar_moeda(df_h['valor'].sum())}**")
+        itens = []
 
-# --- ONDE É MAIS BARATO? ---
-elif menu == "🔍 Onde é mais barato?":
-    st.header("🔍 Onde é mais barato?")
-    if not db["historico"]: st.info("Sem dados.")
-    else:
-        dados = pd.DataFrame([{"Produto": it["produto"].upper(), "Loja": c["loja"], "Preço": it["valor"], "Data": c["data"]} for c in db["historico"] for it in c["itens"]])
-        p_sel = st.selectbox("Produto:", sorted(dados["Produto"].unique()))
-        if p_sel:
-            df_p = dados[dados["Produto"] == p_sel].sort_values("Preço")
-            st.success(f"✅ Melhor Preço: {formatar_moeda(df_p.iloc[0]['Preço'])} no {df_p.iloc[0]['Loja']}")
-            df_p.index = range(1, len(df_p) + 1)
-            df_p["Preço"] = df_p["Preço"].apply(formatar_moeda)
-            st.dataframe(df_p[["Loja", "Preço", "Data"]], use_container_width=True)
+        for c in db["historico"]:
+            if c["mes"] == mes:
+                itens += c["itens"]
+
+        df = pd.DataFrame(itens)
+
+        resumo = df.groupby("categoria")["valor"].sum()
+
+        st.bar_chart(resumo)
+        st.write("💰 Total:", round(df["valor"].sum(), 2))
+
+# ======================
+# HISTÓRICO
+# ======================
+
+elif menu == "🗂 Histórico":
+
+    for c in db["historico"][::-1]:
+
+        with st.expander(f"{c['loja']} — {c['data']}"):
+            st.dataframe(pd.DataFrame(c["itens"]))
