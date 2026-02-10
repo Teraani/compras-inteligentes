@@ -8,15 +8,11 @@ from PIL import Image
 import pandas as pd
 import re
 
-# ======================
-# CONFIG MOBILE
-# ======================
+DB = "compras.json"
 
-st.set_page_config(
-    page_title="Compras Inteligentes",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ==============================
+# CSS — layout compacto (mobile ok)
+# ==============================
 
 st.markdown("""
 <style>
@@ -34,42 +30,45 @@ div[data-testid="stVerticalBlock"] > div {
     margin-bottom: -10px;
 }
 
-#MainMenu {visibility: hidden;}
-header {visibility: hidden;}
-
 </style>
 """, unsafe_allow_html=True)
 
-# ======================
-# BANCO
-# ======================
-
-DB = "compras.json"
+# ==============================
+# Banco
+# ==============================
 
 def load_db():
     if os.path.exists(DB):
         with open(DB, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+
+        if isinstance(data, list):
+            return {"listas": {}, "historico": data}
+
+        return data
+
     return {"listas": {}, "historico": []}
+
 
 def save_db(data):
     with open(DB, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+
 db = load_db()
 
-# ======================
-# CATEGORIA
-# ======================
+# ==============================
+# Categoria simples
+# ==============================
 
 def categorizar(nome):
 
     n = nome.lower()
 
     mapa = {
-        "hortifruti": ["uva", "banana", "manga", "tomate", "laranja", "mamão"],
+        "hortifruti": ["uva", "banana", "manga", "tomate"],
         "padaria": ["pao"],
-        "carnes": ["bovino", "frango", "acem"],
+        "carnes": ["bovino", "frango"],
         "laticinios": ["leite", "queijo"],
     }
 
@@ -79,20 +78,23 @@ def categorizar(nome):
 
     return "outros"
 
-# ======================
-# QR
-# ======================
+# ==============================
+# QR scanner
+# ==============================
 
 def ler_qr(img):
 
-    image = Image.open(img)
-    d = decode(image)
+    try:
+        image = Image.open(img)
+        d = decode(image)
+        return d[0].data.decode() if d else None
 
-    return d[0].data.decode() if d else None
+    except:
+        return None
 
-# ======================
-# LIMPAR VALOR
-# ======================
+# ==============================
+# Limpeza valor
+# ==============================
 
 def limpar_valor(texto):
 
@@ -106,9 +108,9 @@ def limpar_valor(texto):
 
     return 0
 
-# ======================
-# PARSER NFCe
-# ======================
+# ==============================
+# Parser NFC-e (corrigido)
+# ==============================
 
 def extrair_nfce(url):
 
@@ -129,7 +131,7 @@ def extrair_nfce(url):
         nome = item.text.strip()
         nome_l = nome.lower()
 
-        # ignora totais e lixo
+        # 🔥 ignora totais duplicados
         if "vl" in nome_l or "total" in nome_l:
             continue
 
@@ -154,9 +156,9 @@ def extrair_nfce(url):
         "itens": itens
     }
 
-# ======================
+# ==============================
 # UI
-# ======================
+# ==============================
 
 st.title("🛒 Compras Inteligentes")
 
@@ -165,9 +167,9 @@ menu = st.sidebar.radio(
     ["📸 Scan Cupom", "📋 Minhas Listas", "📊 Resumo Mensal", "🗂 Histórico"]
 )
 
-# ======================
+# ==============================
 # SCAN CUPOM
-# ======================
+# ==============================
 
 if menu == "📸 Scan Cupom":
 
@@ -190,7 +192,6 @@ if menu == "📸 Scan Cupom":
         img = st.file_uploader("Fotografe o QR do cupom")
 
         if img:
-
             url = ler_qr(img)
 
             if url:
@@ -205,9 +206,10 @@ if menu == "📸 Scan Cupom":
 
                     compra = extrair_nfce(st.session_state.qr_url)
 
-                    # evita duplicação
+                    # 🔥 evita duplicação
                     if any(c.get("id") == compra["id"] for c in db["historico"]):
                         st.warning("Cupom já importado!")
+
                     else:
                         db["listas"][lista].extend(compra["itens"])
                         db["historico"].append(compra)
@@ -220,9 +222,9 @@ if menu == "📸 Scan Cupom":
                 except Exception as e:
                     st.error(f"Erro: {e}")
 
-# ======================
+# ==============================
 # LISTAS
-# ======================
+# ==============================
 
 elif menu == "📋 Minhas Listas":
 
@@ -237,6 +239,20 @@ elif menu == "📋 Minhas Listas":
 
         lista = st.selectbox("Escolha lista:", list(db["listas"].keys()))
         itens = db["listas"][lista]
+
+        colA, colB = st.columns(2)
+
+        if colA.button("Marcar todos"):
+            for i in itens:
+                i["marcado"] = True
+            save_db(db)
+            st.rerun()
+
+        if colB.button("Desmarcar todos"):
+            for i in itens:
+                i["marcado"] = False
+            save_db(db)
+            st.rerun()
 
         total = 0
 
@@ -258,9 +274,9 @@ elif menu == "📋 Minhas Listas":
         st.divider()
         st.subheader(f"💰 Total marcado: R$ {total:.2f}")
 
-# ======================
+# ==============================
 # RESUMO
-# ======================
+# ==============================
 
 elif menu == "📊 Resumo Mensal":
 
@@ -282,11 +298,11 @@ elif menu == "📊 Resumo Mensal":
         resumo = df.groupby("categoria")["valor"].sum()
 
         st.bar_chart(resumo)
-        st.write("💰 Total:", round(df["valor"].sum(), 2))
+        st.write("💰 Total:", df["valor"].sum())
 
-# ======================
+# ==============================
 # HISTÓRICO
-# ======================
+# ==============================
 
 elif menu == "🗂 Histórico":
 
