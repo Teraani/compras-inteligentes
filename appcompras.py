@@ -341,25 +341,63 @@ elif menu == "📊 Categorias":
 
 elif menu == "📅 Resumo Mensal":
 
+    st.subheader("📅 Resumo mensal")
+
     if not db["historico"]:
-        st.info("Sem compras.")
-    else:
+        st.info("Sem compras registradas.")
+        st.stop()
 
-        meses = sorted({c["mes"] for c in db["historico"]})
-        mes = st.selectbox("Mês:", meses)
+    meses = sorted({c["mes"] for c in db["historico"]})
+    mes = st.selectbox("Selecione o mês:", meses)
 
-        itens = []
+    itens = []
 
-        for c in db["historico"]:
-            if c["mes"] == mes:
-                itens += c["itens"]
+    for c in db["historico"]:
+        if c["mes"] == mes:
+            itens += c["itens"]
 
-        df = pd.DataFrame(itens)
+    if not itens:
+        st.info("Nenhum item neste mês.")
+        st.stop()
 
-        resumo = df.groupby("categoria")["valor"].sum()
+    df = pd.DataFrame(itens)
 
-        st.bar_chart(resumo)
-        st.write("💰 Total do mês:", df["valor"].sum())
+    # ======================
+    # TOTAL DO MÊS
+    # ======================
+
+    total_mes = df["valor"].sum()
+
+    st.metric("💰 Total gasto no mês", f"R$ {total_mes:.2f}")
+
+    st.divider()
+
+    # ======================
+    # GASTOS POR CATEGORIA
+    # ======================
+
+    st.subheader("📊 Gastos por categoria")
+
+    resumo_cat = df.groupby("categoria")["valor"].sum()
+
+    st.bar_chart(resumo_cat)
+
+    st.divider()
+
+    # ======================
+    # TOP 5 PRODUTOS
+    # ======================
+
+    st.subheader("🏆 Top 5 produtos mais caros")
+
+    top5 = (
+        df.groupby("produto")["valor"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(5)
+    )
+
+    st.dataframe(top5.rename("Total gasto"))
 
 # ==============================
 # HISTÓRICO
@@ -371,4 +409,5 @@ elif menu == "🗂 Histórico":
 
         with st.expander(f"{c['loja']} — {c['data']}"):
             st.dataframe(pd.DataFrame(c["itens"]))
+
 
