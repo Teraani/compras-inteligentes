@@ -259,19 +259,81 @@ elif menu == "📋 Listas":
 
 elif menu == "📊 Categorias":
 
-    if not db["historico"]:
-        st.info("Sem dados.")
-    else:
+    st.subheader("Gerenciar categorias")
 
-        itens = []
-        for c in db["historico"]:
-            itens += c["itens"]
+    # junta todos os itens
+    itens = []
+    for c in db["historico"]:
+        itens += c["itens"]
 
-        df = pd.DataFrame(itens)
-        resumo = df.groupby("categoria")["valor"].sum()
+    if not itens:
+        st.info("Sem compras registradas.")
+        st.stop()
 
-        st.bar_chart(resumo)
-        st.write("💰 Total geral:", df["valor"].sum())
+    df = pd.DataFrame(itens)
+
+    categorias_existentes = sorted(df["categoria"].unique())
+
+    st.markdown("### 📂 Categorias atuais")
+
+    for cat in categorias_existentes:
+
+        col1, col2 = st.columns([4,1])
+
+        col1.write(cat)
+
+        if col2.button("🗑", key=f"del_{cat}"):
+
+            # move itens excluídos para "outros"
+            for compra in db["historico"]:
+                for item in compra["itens"]:
+                    if item["categoria"] == cat:
+                        item["categoria"] = "outros"
+
+            save_db(db)
+            st.rerun()
+
+    st.divider()
+
+    st.markdown("### ➕ Nova categoria")
+
+    nova = st.text_input("Nome da categoria")
+
+    if st.button("Criar categoria") and nova:
+
+        for compra in db["historico"]:
+            for item in compra["itens"]:
+                if item["categoria"] == "outros":
+                    item["categoria"] = nova
+
+        save_db(db)
+        st.success("Categoria criada!")
+        st.rerun()
+
+    st.divider()
+
+    st.markdown("### 🔄 Reclassificar itens")
+
+    item_sel = st.selectbox(
+        "Escolha um item:",
+        df["produto"].unique()
+    )
+
+    nova_cat = st.selectbox(
+        "Mover para:",
+        categorias_existentes + ["outros"]
+    )
+
+    if st.button("Atualizar categoria"):
+
+        for compra in db["historico"]:
+            for item in compra["itens"]:
+                if item["produto"] == item_sel:
+                    item["categoria"] = nova_cat
+
+        save_db(db)
+        st.success("Categoria atualizada!")
+        st.rerun()
 
 # ==============================
 # RESUMO MENSAL
@@ -309,3 +371,4 @@ elif menu == "🗂 Histórico":
 
         with st.expander(f"{c['loja']} — {c['data']}"):
             st.dataframe(pd.DataFrame(c["itens"]))
+
