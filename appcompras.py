@@ -10,32 +10,28 @@ import re
 
 DB = "compras.json"
 
-# ==============================
-# CSS — layout compacto (mobile ok)
-# ==============================
+# ======================
+# CSS compacto (mobile)
+# ======================
 
 st.markdown("""
 <style>
-
 .block-container {
     padding-top: 1rem;
     padding-bottom: 1rem;
 }
-
 div[data-testid="stVerticalBlock"] > div {
     gap: 0.5rem;
 }
-
 .stCheckbox {
     margin-bottom: -10px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ==============================
-# Banco
-# ==============================
+# ======================
+# BANCO
+# ======================
 
 def load_db():
     if os.path.exists(DB):
@@ -57,18 +53,18 @@ def save_db(data):
 
 db = load_db()
 
-# ==============================
-# Categoria simples
-# ==============================
+# ======================
+# CATEGORIA
+# ======================
 
 def categorizar(nome):
 
     n = nome.lower()
 
     mapa = {
-        "hortifruti": ["uva", "banana", "manga", "tomate"],
+        "hortifruti": ["uva", "banana", "manga", "tomate", "laranja", "mamão"],
         "padaria": ["pao"],
-        "carnes": ["bovino", "frango"],
+        "carnes": ["bovino", "frango", "acem"],
         "laticinios": ["leite", "queijo"],
     }
 
@@ -78,23 +74,21 @@ def categorizar(nome):
 
     return "outros"
 
-# ==============================
+# ======================
 # QR scanner
-# ==============================
+# ======================
 
 def ler_qr(img):
-
     try:
         image = Image.open(img)
         d = decode(image)
         return d[0].data.decode() if d else None
-
     except:
         return None
 
-# ==============================
-# Limpeza valor
-# ==============================
+# ======================
+# LIMPAR VALOR
+# ======================
 
 def limpar_valor(texto):
 
@@ -108,9 +102,9 @@ def limpar_valor(texto):
 
     return 0
 
-# ==============================
-# Parser NFC-e (corrigido)
-# ==============================
+# ======================
+# PARSER NFC-e
+# ======================
 
 def extrair_nfce(url):
 
@@ -131,7 +125,6 @@ def extrair_nfce(url):
         nome = item.text.strip()
         nome_l = nome.lower()
 
-        # 🔥 ignora totais duplicados
         if "vl" in nome_l or "total" in nome_l:
             continue
 
@@ -156,22 +149,26 @@ def extrair_nfce(url):
         "itens": itens
     }
 
-# ==============================
-# UI
-# ==============================
+# ======================
+# UI — MENU MOBILE
+# ======================
 
 st.title("🛒 Compras Inteligentes")
 
-menu = st.sidebar.radio(
-    "Menu",
-    ["📸 Scan Cupom", "📋 Minhas Listas", "📊 Resumo Mensal", "🗂 Histórico"]
-)
+tabs = st.tabs([
+    "📸 Scan Cupom",
+    "📋 Minhas Listas",
+    "📊 Resumo Mensal",
+    "🗂 Histórico"
+])
 
-# ==============================
+scan_tab, lista_tab, resumo_tab, hist_tab = tabs
+
+# ======================
 # SCAN CUPOM
-# ==============================
+# ======================
 
-if menu == "📸 Scan Cupom":
+with scan_tab:
 
     if "qr_url" not in st.session_state:
         st.session_state.qr_url = None
@@ -206,10 +203,8 @@ if menu == "📸 Scan Cupom":
 
                     compra = extrair_nfce(st.session_state.qr_url)
 
-                    # 🔥 evita duplicação
                     if any(c.get("id") == compra["id"] for c in db["historico"]):
                         st.warning("Cupom já importado!")
-
                     else:
                         db["listas"][lista].extend(compra["itens"])
                         db["historico"].append(compra)
@@ -222,11 +217,11 @@ if menu == "📸 Scan Cupom":
                 except Exception as e:
                     st.error(f"Erro: {e}")
 
-# ==============================
+# ======================
 # LISTAS
-# ==============================
+# ======================
 
-elif menu == "📋 Minhas Listas":
+with lista_tab:
 
     nova = st.text_input("Nova lista")
 
@@ -239,20 +234,6 @@ elif menu == "📋 Minhas Listas":
 
         lista = st.selectbox("Escolha lista:", list(db["listas"].keys()))
         itens = db["listas"][lista]
-
-        colA, colB = st.columns(2)
-
-        if colA.button("Marcar todos"):
-            for i in itens:
-                i["marcado"] = True
-            save_db(db)
-            st.rerun()
-
-        if colB.button("Desmarcar todos"):
-            for i in itens:
-                i["marcado"] = False
-            save_db(db)
-            st.rerun()
 
         total = 0
 
@@ -274,11 +255,11 @@ elif menu == "📋 Minhas Listas":
         st.divider()
         st.subheader(f"💰 Total marcado: R$ {total:.2f}")
 
-# ==============================
+# ======================
 # RESUMO
-# ==============================
+# ======================
 
-elif menu == "📊 Resumo Mensal":
+with resumo_tab:
 
     if not db["historico"]:
         st.info("Sem compras.")
@@ -300,13 +281,12 @@ elif menu == "📊 Resumo Mensal":
         st.bar_chart(resumo)
         st.write("💰 Total:", df["valor"].sum())
 
-# ==============================
+# ======================
 # HISTÓRICO
-# ==============================
+# ======================
 
-elif menu == "🗂 Histórico":
+with hist_tab:
 
     for c in db["historico"][::-1]:
-
         with st.expander(f"{c['loja']} — {c['data']}"):
             st.dataframe(pd.DataFrame(c["itens"]))
